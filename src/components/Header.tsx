@@ -14,19 +14,21 @@ import {
   AlertTriangle, 
   Play, 
   FolderArchive, 
-  Sliders, 
-  Languages 
+  Sliders,
+  Languages,
+  History
 } from 'lucide-react';
 
 interface HeaderProps {
   currentConfig: WorkflowConfig;
   qualityScore: number;
-  activeTab: 'runner' | 'files' | 'config';
-  onSelectTab: (tab: 'runner' | 'files' | 'config') => void;
+  activeTab: 'runner' | 'files' | 'history' | 'config';
+  onSelectTab: (tab: 'runner' | 'files' | 'history' | 'config') => void;
   language: 'ur' | 'en';
   onToggleLanguage: () => void;
   security: AccountSecurity;
   onOpenSecurityCenter: () => void;
+  historyCount?: number;
   onSelectPreset: (presetId: string) => void;
   onOpenKeystoreHelper: () => void;
   onOpenGradleSnippet: () => void;
@@ -46,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleLanguage,
   security,
   onOpenSecurityCenter,
+  historyCount = 0,
   onSelectPreset,
   onOpenKeystoreHelper,
   onOpenGradleSnippet,
@@ -78,18 +81,18 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <p className="text-xs text-slate-400">
                 {language === 'ur'
-                  ? 'تمام بلڈ فائلز، سورس کوڈ ZIP اپلوڈ، خودکار رنر، اور ڈیبگ APK ڈاؤنلوڈر'
-                  : 'Complete Android build files, ZIP upload, Action Runner & debug APK downloader'}
+                  ? 'تمام بلڈ فائلز، سورس کوڈ ZIP اپلوڈ، خودکار رنر، بلڈ ہسٹری، اور ڈیبگ APK ڈاؤنلوڈر'
+                  : 'Complete Android build files, ZIP upload, Action Runner, Build History & APK downloader'}
               </p>
             </div>
           </div>
 
           {/* Center Navigation Tabs */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs self-start lg:self-auto">
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs self-start lg:self-auto overflow-x-auto max-w-full">
             <button
               id="tab-runner-btn"
               onClick={() => onSelectTab('runner')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer shrink-0 ${
                 activeTab === 'runner'
                   ? 'bg-emerald-600 text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'
@@ -102,20 +105,45 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="tab-files-btn"
               onClick={() => onSelectTab('files')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer shrink-0 ${
                 activeTab === 'files'
                   ? 'bg-emerald-600 text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <FolderArchive className="w-3.5 h-3.5" />
-              <span>{language === 'ur' ? 'پراجیکٹ فائلز اور اپلوڈ' : 'Files & Upload'}</span>
+              <span>{language === 'ur' ? 'پراجیکٹ فائلز' : 'Project Files'}</span>
+            </button>
+
+            {/* TAB: BUILD HISTORY (NEW) */}
+            <button
+              id="tab-history-btn"
+              onClick={() => onSelectTab('history')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer shrink-0 ${
+                activeTab === 'history'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>{language === 'ur' ? 'بلڈ ہسٹری اور ایڈیٹر' : 'Build History & Edit'}</span>
+              {historyCount > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    activeTab === 'history'
+                      ? 'bg-emerald-950 text-emerald-200'
+                      : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {historyCount}
+                </span>
+              )}
             </button>
 
             <button
               id="tab-config-btn"
               onClick={() => onSelectTab('config')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer shrink-0 ${
                 activeTab === 'config'
                   ? 'bg-emerald-600 text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'

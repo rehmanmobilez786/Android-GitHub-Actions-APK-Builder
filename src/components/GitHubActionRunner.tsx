@@ -17,7 +17,9 @@ import {
   ShieldAlert, 
   ArrowRight,
   GitBranch,
-  Radio
+  Radio,
+  Edit3,
+  History
 } from 'lucide-react';
 import { generateDebugApkBlob } from '../utils/zipHandler';
 import { AccountSecurity } from '../types';
@@ -29,6 +31,15 @@ interface GitHubActionRunnerProps {
   security: AccountSecurity;
   onUpdateSecurity: (newSec: AccountSecurity) => void;
   onOpenSecurityCenter: () => void;
+  onBuildComplete?: (buildInfo: {
+    appName: string;
+    versionName: string;
+    versionCode: number;
+    variant: 'debug' | 'release';
+    status: 'success' | 'failed';
+  }) => void;
+  onEditCurrentBuild?: () => void;
+  onNavigateToHistory?: () => void;
 }
 
 interface StepLog {
@@ -114,6 +125,9 @@ export const GitHubActionRunner: React.FC<GitHubActionRunnerProps> = ({
   security,
   onUpdateSecurity,
   onOpenSecurityCenter,
+  onBuildComplete,
+  onEditCurrentBuild,
+  onNavigateToHistory,
 }) => {
   const [triggerMode, setTriggerMode] = useState<'manual' | 'auto'>('manual');
   const [selectedBranch, setSelectedBranch] = useState('main');
@@ -322,6 +336,17 @@ export const GitHubActionRunner: React.FC<GitHubActionRunnerProps> = ({
     pushLog('🎉 Workflow Run Completed Successfully! Artifact "app-debug.apk" is ready for download.');
     setRunStatus('success');
     setIsRunning(false);
+
+    // Record in APK Build History
+    if (onBuildComplete) {
+      onBuildComplete({
+        appName: 'GitHub Action APK',
+        versionName: '1.0.1',
+        versionCode: 2,
+        variant: buildVariant === 'release' ? 'release' : 'debug',
+        status: 'success',
+      });
+    }
   };
 
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -730,19 +755,53 @@ export const GitHubActionRunner: React.FC<GitHubActionRunnerProps> = ({
               </div>
             </div>
 
-            {/* Big Direct APK Download Button */}
-            <button
-              id="download-debug-apk-btn"
-              onClick={handleDownloadApk}
-              className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/20 transition cursor-pointer shrink-0 transform active:scale-95"
-            >
-              <Download className="w-5 h-5 stroke-[2.5]" />
-              <span>
-                {apkDownloaded
-                  ? (language === 'ur' ? '✓ ڈاؤنلوڈ شروع ہو گیا!' : '✓ APK Downloaded!')
-                  : (language === 'ur' ? '📥 app-debug.apk ڈاؤنلوڈ کریں' : 'Download app-debug.apk')}
-              </span>
-            </button>
+            {/* Action Buttons: Download + Edit & Re-build + History */}
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {/* Big Direct APK Download Button */}
+              <button
+                id="download-debug-apk-btn"
+                onClick={handleDownloadApk}
+                className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/20 transition cursor-pointer shrink-0 transform active:scale-95"
+              >
+                <Download className="w-4 h-4 stroke-[2.5]" />
+                <span>
+                  {apkDownloaded
+                    ? (language === 'ur' ? '✓ ڈاؤنلوڈ ہو گیا!' : '✓ Downloaded!')
+                    : (language === 'ur' ? '📥 app-debug.apk ڈاؤنلوڈ' : 'Download app-debug.apk')}
+                </span>
+              </button>
+
+              {/* Edit this Build Button */}
+              {onEditCurrentBuild && (
+                <button
+                  id="runner-edit-build-btn"
+                  onClick={onEditCurrentBuild}
+                  className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/40 font-bold text-xs transition cursor-pointer"
+                  title="Modify app name, version, and rebuild"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-sky-300" />
+                  <span>
+                    {language === 'ur'
+                      ? 'اس بلڈ میں تبدیلی کریں'
+                      : 'Edit & Rebuild'}
+                  </span>
+                </button>
+              )}
+
+              {/* View History Button */}
+              {onNavigateToHistory && (
+                <button
+                  id="runner-history-nav-btn"
+                  onClick={onNavigateToHistory}
+                  className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 font-semibold text-xs transition cursor-pointer"
+                >
+                  <History className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    {language === 'ur' ? 'ہسٹری دیکھیں' : 'View History'}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

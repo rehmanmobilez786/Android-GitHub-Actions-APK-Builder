@@ -111,3 +111,34 @@ export interface AccountSecurity {
   auditLogs: SecurityAuditLog[];
 }
 
+export interface ApkBuildHistoryItem {
+  id: string;
+  buildNumber: number;
+  timestamp: string;
+  appName: string;
+  packageName: string;
+  versionName: string;
+  versionCode: number;
+  variant: 'debug' | 'release';
+  status: 'success' | 'failed';
+  apkFileName: string;
+  apkSize: string;
+  sha256: string;
+  workflowYaml: string;
+  projectFilesSummary?: {
+    filesCount: number;
+    gradleVersion?: string;
+    compileSdk?: string;
+  };
+  projectFilesSnapshot?: {
+    path: string;
+    name: string;
+    content: string;
+  }[];
+  notes?: string;
+  triggeredBy: 'manual' | 'auto_push' | 'rebuild_edit';
+  durationSeconds: number;
+  changesSummary?: string;
+}
+
+

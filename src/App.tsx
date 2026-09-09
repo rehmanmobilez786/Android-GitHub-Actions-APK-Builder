@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { WorkflowConfig, AccountSecurity } from './types';
+import { WorkflowConfig, AccountSecurity, ApkBuildHistoryItem } from './types';
 import { defaultConfig, PRESETS } from './data/presets';
 import { generateWorkflowYaml } from './utils/yamlGenerator';
 import { validateWorkflowConfig } from './utils/yamlValidator';
@@ -15,6 +15,17 @@ import { GitHubActionRunner } from './components/GitHubActionRunner';
 import { AndroidProjectViewer } from './components/AndroidProjectViewer';
 import { SecurityBanner } from './components/SecurityBanner';
 import { SecurityCenterModal } from './components/SecurityCenterModal';
+import { BuildHistoryViewer } from './components/BuildHistoryViewer';
+import { EditBuildModal } from './components/EditBuildModal';
+import { AndroidProjectFile, DEFAULT_ANDROID_FILES } from './data/defaultAndroidProject';
+import { 
+  getBuildHistory, 
+  addBuildToHistory, 
+  deleteBuildFromHistory, 
+  applyModificationsToProjectFiles,
+  generateSafeSha256,
+  BuildEditFormValues
+} from './utils/historyStorage';
 import { 
   Play, 
   FolderArchive, 
@@ -25,15 +36,22 @@ import {
   ShieldCheck, 
   ShieldAlert,
   Download,
-  AlertCircle
+  AlertCircle,
+  History
 } from 'lucide-react';
 
 export default function App() {
   const [config, setConfig] = useState<WorkflowConfig>({ ...defaultConfig });
   const [customYaml, setCustomYaml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'runner' | 'files' | 'config'>('runner');
+  const [activeTab, setActiveTab] = useState<'runner' | 'files' | 'history' | 'config'>('runner');
   const [language, setLanguage] = useState<'ur' | 'en'>('ur');
+
+  // Build History State & Project Files State
+  const [buildHistory, setBuildHistory] = useState<ApkBuildHistoryItem[]>(() => getBuildHistory());
+  const [projectFiles, setProjectFiles] = useState<AndroidProjectFile[]>([...DEFAULT_ANDROID_FILES]);
+  const [editingBuildItem, setEditingBuildItem] = useState<ApkBuildHistoryItem | null>(null);
+  const [isEditBuildModalOpen, setIsEditBuildModalOpen] = useState(false);
 
   // Account Security State (Active, Suspended, Blocked)
   const [security, setSecurity] = useState<AccountSecurity>({
@@ -112,6 +130,125 @@ export default function App() {
     setLanguage((prev) => (prev === 'ur' ? 'en' : 'ur'));
   };
 
+  // Build History & Edit Handlers
+  const handleSelectEditBuild = (item: ApkBuildHistoryItem) => {
+    setEditingBuildItem(item);
+    setIsEditBuildModalOpen(true);
+  };
+
+  const handleSaveAndRebuild = (values: BuildEditFormValues, autoRunBuild: boolean) => {
+    const updatedFiles = applyModificationsToProjectFiles(projectFiles, values);
+    setProjectFiles(updatedFiles);
+
+    const nextBuildNumber =
+      buildHistory && buildHistory.length > 0
+        ? Math.max(100, ...buildHistory.map((b) => Number(b?.buildNumber) || 100)) + 1
+        : 103;
+
+    const shaHex = generateSafeSha256();
+
+    const newBuildItem: ApkBuildHistoryItem = {
+      id: `build-${nextBuildNumber}`,
+      buildNumber: nextBuildNumber,
+      timestamp: new Date().toLocaleString(),
+      appName: values.appName,
+      packageName: values.packageName,
+      versionName: values.versionName,
+      versionCode: values.versionCode,
+      variant: values.variant,
+      status: 'success',
+      apkFileName: `app-${values.variant}.apk`,
+      apkSize: values.variant === 'release' ? '12.4 MB' : '14.9 MB',
+      sha256: shaHex,
+      workflowYaml: activeYaml,
+      durationSeconds: 74,
+      triggeredBy: 'rebuild_edit',
+      notes: values.notes,
+      changesSummary: `Modified app "${values.appName}" to v${values.versionName} (Build ${values.versionCode}). Target SDK ${values.compileSdk}.`,
+      projectFilesSummary: {
+        filesCount: updatedFiles.length,
+        gradleVersion: '8.5',
+        compileSdk: values.compileSdk.toString(),
+      },
+      projectFilesSnapshot: updatedFiles.map((f) => ({
+        path: f.path,
+        name: f.name,
+        content: f.content,
+      })),
+    };
+
+    const updatedHistory = addBuildToHistory(newBuildItem);
+    setBuildHistory(updatedHistory);
+
+    if (autoRunBuild) {
+      setActiveTab('runner');
+    }
+  };
+
+  const handleRestoreBuildFiles = (item: ApkBuildHistoryItem) => {
+    if (item.projectFilesSnapshot && item.projectFilesSnapshot.length > 0) {
+      const restored = projectFiles.map((f) => {
+        const found = item.projectFilesSnapshot?.find((s) => s.path === f.path);
+        return found ? { ...f, content: found.content } : f;
+      });
+      setProjectFiles(restored);
+    }
+    setActiveTab('files');
+  };
+
+  const handleDeleteBuild = (id: string) => {
+    const updated = deleteBuildFromHistory(id);
+    setBuildHistory(updated);
+  };
+
+  const handleRunnerBuildComplete = (info: {
+    appName: string;
+    versionName: string;
+    versionCode: number;
+    variant: 'debug' | 'release';
+    status: 'success' | 'failed';
+  }) => {
+    const nextBuildNumber =
+      buildHistory && buildHistory.length > 0
+        ? Math.max(100, ...buildHistory.map((b) => Number(b?.buildNumber) || 100)) + 1
+        : 103;
+
+    const shaHex = generateSafeSha256();
+
+    const newBuildItem: ApkBuildHistoryItem = {
+      id: `build-${nextBuildNumber}`,
+      buildNumber: nextBuildNumber,
+      timestamp: new Date().toLocaleString(),
+      appName: info.appName,
+      packageName: 'com.example.githubactionapk',
+      versionName: info.versionName,
+      versionCode: info.versionCode,
+      variant: info.variant,
+      status: info.status,
+      apkFileName: `app-${info.variant}.apk`,
+      apkSize: '14.8 MB',
+      sha256: shaHex,
+      workflowYaml: activeYaml,
+      durationSeconds: 78,
+      triggeredBy: 'manual',
+      notes: 'Automated GitHub Actions CI/CD runner artifact generation.',
+      changesSummary: `Completed automated ${info.variant.toUpperCase()} build v${info.versionName}.`,
+      projectFilesSummary: {
+        filesCount: projectFiles.length,
+        gradleVersion: '8.5',
+        compileSdk: '34',
+      },
+      projectFilesSnapshot: projectFiles.map((f) => ({
+        path: f.path,
+        name: f.name,
+        content: f.content,
+      })),
+    };
+
+    const updatedHistory = addBuildToHistory(newBuildItem);
+    setBuildHistory(updatedHistory);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
       {/* Top Header */}
@@ -124,6 +261,7 @@ export default function App() {
         onToggleLanguage={handleToggleLanguage}
         security={security}
         onOpenSecurityCenter={() => setIsSecurityCenterOpen(true)}
+        historyCount={buildHistory.length}
         onSelectPreset={handleSelectPreset}
         onOpenKeystoreHelper={() => setIsKeystoreModalOpen(true)}
         onOpenGradleSnippet={() => setIsGradleModalOpen(true)}
@@ -167,6 +305,13 @@ export default function App() {
           {/* Quick Shortcuts */}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setActiveTab('history')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700/80 transition cursor-pointer text-[11px]"
+            >
+              <History className="w-3 h-3" />
+              <span>{language === 'ur' ? 'بلڈ ہسٹری' : 'Build History'} ({buildHistory.length})</span>
+            </button>
+            <button
               onClick={() => setIsKeystoreModalOpen(true)}
               className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition cursor-pointer text-[11px]"
             >
@@ -207,6 +352,13 @@ export default function App() {
             security={security}
             onUpdateSecurity={setSecurity}
             onOpenSecurityCenter={() => setIsSecurityCenterOpen(true)}
+            onBuildComplete={handleRunnerBuildComplete}
+            onEditCurrentBuild={() => {
+              if (buildHistory.length > 0) {
+                handleSelectEditBuild(buildHistory[0]);
+              }
+            }}
+            onNavigateToHistory={() => setActiveTab('history')}
           />
         )}
 
@@ -216,10 +368,25 @@ export default function App() {
             currentYaml={activeYaml}
             onUpdateYaml={(newYaml) => setCustomYaml(newYaml)}
             language={language}
+            projectFiles={projectFiles}
+            onUpdateProjectFiles={setProjectFiles}
           />
         )}
 
-        {/* TAB 3: Workflow Configurator & YAML Viewer */}
+        {/* TAB 3: Build History Viewer & APK Modifier (NEW) */}
+        {activeTab === 'history' && (
+          <BuildHistoryViewer
+            history={buildHistory}
+            onSelectEditBuild={handleSelectEditBuild}
+            onRestoreBuildFiles={handleRestoreBuildFiles}
+            onDeleteBuild={handleDeleteBuild}
+            security={security}
+            onOpenSecurityCenter={() => setIsSecurityCenterOpen(true)}
+            language={language}
+          />
+        )}
+
+        {/* TAB 4: Workflow Configurator & YAML Viewer */}
         {activeTab === 'config' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-start">
             {/* Left Column: Interactive Configurator */}
@@ -246,6 +413,14 @@ export default function App() {
       </main>
 
       {/* Modals */}
+      <EditBuildModal
+        isOpen={isEditBuildModalOpen}
+        onClose={() => setIsEditBuildModalOpen(false)}
+        buildItem={editingBuildItem}
+        onSaveAndRebuild={handleSaveAndRebuild}
+        language={language}
+      />
+
       <SecurityCenterModal
         isOpen={isSecurityCenterOpen}
         onClose={() => setIsSecurityCenterOpen(false)}

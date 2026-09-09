@@ -22,17 +22,29 @@ interface AndroidProjectViewerProps {
   currentYaml: string;
   onUpdateYaml: (yaml: string) => void;
   language: 'ur' | 'en';
+  projectFiles?: AndroidProjectFile[];
+  onUpdateProjectFiles?: (files: AndroidProjectFile[]) => void;
 }
 
 export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
   currentYaml,
   onUpdateYaml,
   language,
+  projectFiles,
+  onUpdateProjectFiles,
 }) => {
-  const [files, setFiles] = useState<AndroidProjectFile[]>([...DEFAULT_ANDROID_FILES]);
+  const [files, setFiles] = useState<AndroidProjectFile[]>(projectFiles || [...DEFAULT_ANDROID_FILES]);
   const [selectedFilePath, setSelectedFilePath] = useState<string>('.github/workflows/android-build.yml');
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Sync when projectFiles prop changes (e.g. edited from build history)
+  React.useEffect(() => {
+    if (projectFiles && projectFiles.length > 0) {
+      setFiles(projectFiles);
+    }
+  }, [projectFiles]);
+
   const [uploadReport, setUploadReport] = useState<{
     package?: string;
     sdk?: number;
@@ -109,6 +121,7 @@ export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
 
         // Add to files state
         setFiles(extracted);
+        onUpdateProjectFiles?.(extracted);
         setSelectedFilePath(extracted[0].path);
         setUploadReport(report);
       }
@@ -148,7 +161,11 @@ export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
       });
     }
 
-    setFiles((prev) => [...prev, ...newFiles]);
+    setFiles((prev) => {
+      const updated = [...prev, ...newFiles];
+      onUpdateProjectFiles?.(updated);
+      return updated;
+    });
     setSelectedFilePath(newFiles[0].path);
     if (singleFileInputRef.current) singleFileInputRef.current.value = '';
   };
