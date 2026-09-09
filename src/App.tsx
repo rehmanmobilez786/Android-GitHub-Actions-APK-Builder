@@ -17,6 +17,7 @@ import { SecurityBanner } from './components/SecurityBanner';
 import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { BuildHistoryViewer } from './components/BuildHistoryViewer';
 import { EditBuildModal } from './components/EditBuildModal';
+import { GitHubPagesHelpModal } from './components/GitHubPagesHelpModal';
 import { AndroidProjectFile, DEFAULT_ANDROID_FILES } from './data/defaultAndroidProject';
 import { 
   getBuildHistory, 
@@ -37,7 +38,8 @@ import {
   ShieldAlert,
   Download,
   AlertCircle,
-  History
+  History,
+  Globe
 } from 'lucide-react';
 
 export default function App() {
@@ -77,6 +79,7 @@ export default function App() {
   const [isGradleModalOpen, setIsGradleModalOpen] = useState(false);
   const [isSecretsModalOpen, setIsSecretsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isGitHubPagesModalOpen, setIsGitHubPagesModalOpen] = useState(false);
 
   // Generate YAML and Annotations
   const { yaml: generatedYaml, annotations } = useMemo(() => {
@@ -267,6 +270,7 @@ export default function App() {
         onOpenGradleSnippet={() => setIsGradleModalOpen(true)}
         onOpenSecretsChecklist={() => setIsSecretsModalOpen(true)}
         onOpenAiCustomizer={() => setIsAiModalOpen(true)}
+        onOpenGitHubPagesHelp={() => setIsGitHubPagesModalOpen(true)}
         onCopyYaml={handleCopyYaml}
         onDownloadYaml={handleDownloadYaml}
         copied={copied}
@@ -331,6 +335,15 @@ export default function App() {
             >
               <ShieldCheck className="w-3 h-3" />
               <span>GitHub Secrets</span>
+            </button>
+            <button
+              id="quick-gh-pages-btn"
+              onClick={() => setIsGitHubPagesModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-gradient-to-r from-teal-500/20 to-emerald-500/20 hover:from-teal-500/30 hover:to-emerald-500/30 text-teal-300 border border-teal-500/50 transition cursor-pointer text-[11px] font-semibold"
+              title="Fix ez786.github.io blank page"
+            >
+              <Globe className="w-3 h-3 text-emerald-400" />
+              <span>{language === 'ur' ? 'ez786 بلینک پیج حل' : 'Fix ez786 Blank'}</span>
             </button>
           </div>
 
@@ -452,6 +465,12 @@ export default function App() {
         onClose={() => setIsAiModalOpen(false)}
         currentYaml={activeYaml}
         onApplyYaml={handleApplyAiYaml}
+      />
+
+      <GitHubPagesHelpModal
+        isOpen={isGitHubPagesModalOpen}
+        onClose={() => setIsGitHubPagesModalOpen(false)}
+        language={language}
       />
     </div>
   );

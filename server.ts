@@ -1,5 +1,7 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import JSZip from "jszip";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 
@@ -132,6 +134,48 @@ Diagnose this Android build failure and produce the corrected workflow or build 
     return res.status(500).json({
       error: err.message || "Failed to auto-fix build error with Gemini AI.",
     });
+  }
+});
+
+// Download pre-built static website zip ready for GitHub Pages manual upload
+app.get("/api/download-dist", async (req, res) => {
+  try {
+    const distPath = path.join(process.cwd(), "dist");
+    if (!fs.existsSync(distPath) || !fs.existsSync(path.join(distPath, "index.html"))) {
+      return res.status(503).json({
+        error: "Build output is not ready. Please wait a moment and try again.",
+      });
+    }
+
+    const zip = new JSZip();
+
+    // 1. Add compiled index.html
+    const indexHtml = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+    zip.file("index.html", indexHtml);
+
+    // 2. Add .nojekyll so GitHub Pages does not ignore underscore files or run Jekyll
+    zip.file(".nojekyll", "");
+
+    // 3. Add assets folder
+    const assetsDir = path.join(distPath, "assets");
+    if (fs.existsSync(assetsDir)) {
+      const assetFiles = fs.readdirSync(assetsDir);
+      for (const file of assetFiles) {
+        const filePath = path.join(assetsDir, file);
+        if (fs.statSync(filePath).isFile()) {
+          const content = fs.readFileSync(filePath);
+          zip.file(`assets/${file}`, content);
+        }
+      }
+    }
+
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", 'attachment; filename="github-pages-ready.zip"');
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error("Error creating dist zip:", err);
+    return res.status(500).json({ error: err.message || "Failed to generate zip." });
   }
 });
 

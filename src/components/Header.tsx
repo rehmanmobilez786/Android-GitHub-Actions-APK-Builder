@@ -16,7 +16,8 @@ import {
   FolderArchive, 
   Sliders,
   Languages,
-  History
+  History,
+  Globe
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -34,6 +35,7 @@ interface HeaderProps {
   onOpenGradleSnippet: () => void;
   onOpenSecretsChecklist: () => void;
   onOpenAiCustomizer: () => void;
+  onOpenGitHubPagesHelp?: () => void;
   onCopyYaml: () => void;
   onDownloadYaml: () => void;
   copied: boolean;
@@ -54,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGradleSnippet,
   onOpenSecretsChecklist,
   onOpenAiCustomizer,
+  onOpenGitHubPagesHelp,
   onCopyYaml,
   onDownloadYaml,
   copied,
@@ -201,6 +204,18 @@ export const Header: React.FC<HeaderProps> = ({
               <Languages className="w-3.5 h-3.5 text-emerald-400" />
               <span>{language === 'ur' ? 'English' : 'اردو (Urdu)'}</span>
             </button>
+
+            {onOpenGitHubPagesHelp && (
+              <button
+                id="header-gh-pages-btn"
+                onClick={onOpenGitHubPagesHelp}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-teal-600/20 to-emerald-600/20 hover:from-teal-600/30 hover:to-emerald-600/30 border border-teal-500/50 text-teal-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+                title="Fix ez786.github.io blank page"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{language === 'ur' ? 'گٹ ہب پیجز فکسر' : 'GitHub Pages Fix'}</span>
+              </button>
+            )}
 
             <button
               onClick={onOpenAiCustomizer}
