@@ -1,0 +1,157 @@
+import { PresetDefinition, WorkflowConfig } from '../types';
+
+export const defaultConfig: WorkflowConfig = {
+  workflowName: 'Android Universal CI/CD',
+  filename: 'android-build.yml',
+  triggers: {
+    pushBranches: ['main', 'master', 'release/*'],
+    prBranches: ['main', 'master', 'develop'],
+    tagPatterns: ['v*.*.*'],
+    workflowDispatch: true,
+  },
+  environment: {
+    runnerOS: 'ubuntu-latest',
+    javaVersion: '17',
+    javaDistro: 'temurin',
+    enableGradleCache: true,
+    agpBuildCache: true,
+  },
+  qualityChecks: {
+    runUnitTests: true,
+    runAndroidLint: true,
+    uploadSarifReport: true,
+    runDetekt: false,
+    uploadTestResults: true,
+  },
+  buildVariants: {
+    buildDebugApk: true,
+    buildReleaseApk: true,
+    buildReleaseAab: true,
+    buildFlavors: [],
+    splitByAbi: false,
+  },
+  signing: {
+    enableKeystoreSigning: true,
+    keystoreSecretName: 'KEYSTORE_BASE64',
+    aliasSecretName: 'RELEASE_KEY_ALIAS',
+    storePasswordSecretName: 'RELEASE_STORE_PASSWORD',
+    keyPasswordSecretName: 'RELEASE_KEY_PASSWORD',
+    keystorePath: 'app/release.jks',
+  },
+  deployments: {
+    uploadArtifacts: true,
+    artifactRetentionDays: 30,
+    createGithubRelease: true,
+    githubReleaseOnTagOnly: true,
+    enableFirebaseAppDistribution: true,
+    firebaseAppIdSecret: 'FIREBASE_APP_ID',
+    firebaseTokenSecret: 'FIREBASE_TOKEN',
+    firebaseGroups: 'qa-testers,internal',
+    enableGooglePlay: false,
+    googlePlayTrack: 'internal',
+    googlePlayJsonSecret: 'PLAY_SERVICE_ACCOUNT_JSON',
+  },
+  notifications: {
+    enableSlack: true,
+    slackWebhookSecret: 'SLACK_WEBHOOK_URL',
+    enableDiscord: false,
+    discordWebhookSecret: 'DISCORD_WEBHOOK_URL',
+  },
+  matrix: {
+    enableMatrix: false,
+    matrixFlavors: ['dev', 'prod'],
+    matrixBuildTypes: ['debug', 'release'],
+  },
+};
+
+export const PRESETS: PresetDefinition[] = [
+  {
+    id: 'universal-production',
+    name: 'Universal Production CI/CD',
+    description: 'All-in-one Android workflow: Android Lint, Unit Tests, Keystore Signing, APK & AAB Generation, GitHub Releases, Firebase App Distribution, and Slack alerts.',
+    badge: 'Recommended',
+    config: { ...defaultConfig },
+  },
+  {
+    id: 'pr-verification',
+    name: 'Pull Request Verification (Fast CI)',
+    description: 'Fast lightweight check for incoming PRs: runs Android Lint, JUnit unit tests, compiles Debug APK, and uploads test reports without release signing.',
+    badge: 'PR Check',
+    config: {
+      ...defaultConfig,
+      workflowName: 'Android PR Verification',
+      filename: 'android-pr.yml',
+      triggers: {
+        pushBranches: [],
+        prBranches: ['main', 'master', 'develop'],
+        tagPatterns: [],
+        workflowDispatch: true,
+      },
+      buildVariants: {
+        buildDebugApk: true,
+        buildReleaseApk: false,
+        buildReleaseAab: false,
+        buildFlavors: [],
+        splitByAbi: false,
+      },
+      signing: {
+        ...defaultConfig.signing,
+        enableKeystoreSigning: false,
+      },
+      deployments: {
+        ...defaultConfig.deployments,
+        createGithubRelease: false,
+        enableFirebaseAppDistribution: false,
+        enableGooglePlay: false,
+      },
+    },
+  },
+  {
+    id: 'play-store-release',
+    name: 'Google Play Store Release',
+    description: 'Production release pipeline that builds signed Android App Bundle (.aab), creates a GitHub Release on tag, and auto-uploads to Google Play internal or beta track.',
+    badge: 'Publishing',
+    config: {
+      ...defaultConfig,
+      workflowName: 'Google Play Release',
+      filename: 'play-store-release.yml',
+      triggers: {
+        pushBranches: [],
+        prBranches: [],
+        tagPatterns: ['v*'],
+        workflowDispatch: true,
+      },
+      buildVariants: {
+        buildDebugApk: false,
+        buildReleaseApk: true,
+        buildReleaseAab: true,
+        buildFlavors: [],
+        splitByAbi: false,
+      },
+      deployments: {
+        ...defaultConfig.deployments,
+        createGithubRelease: true,
+        githubReleaseOnTagOnly: true,
+        enableGooglePlay: true,
+        googlePlayTrack: 'internal',
+        enableFirebaseAppDistribution: false,
+      },
+    },
+  },
+  {
+    id: 'multi-flavor-matrix',
+    name: 'Multi-Flavor Matrix Build',
+    description: 'Parallel matrix build for apps with multiple product flavors (e.g. dev, staging, prod) building all variant APKs simultaneously in isolated runner jobs.',
+    badge: 'Matrix',
+    config: {
+      ...defaultConfig,
+      workflowName: 'Android Multi-Flavor Matrix',
+      filename: 'android-matrix.yml',
+      matrix: {
+        enableMatrix: true,
+        matrixFlavors: ['dev', 'staging', 'prod'],
+        matrixBuildTypes: ['debug', 'release'],
+      },
+    },
+  },
+];
