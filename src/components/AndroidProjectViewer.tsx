@@ -15,7 +15,8 @@ import {
   Plus, 
   RefreshCw,
   Sparkles,
-  Info
+  Info,
+  Trash2
 } from 'lucide-react';
 
 interface AndroidProjectViewerProps {
@@ -24,6 +25,7 @@ interface AndroidProjectViewerProps {
   language: 'ur' | 'en';
   projectFiles?: AndroidProjectFile[];
   onUpdateProjectFiles?: (files: AndroidProjectFile[]) => void;
+  onOpenRepoCleaner?: () => void;
 }
 
 export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
@@ -32,6 +34,7 @@ export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
   language,
   projectFiles,
   onUpdateProjectFiles,
+  onOpenRepoCleaner,
 }) => {
   const [files, setFiles] = useState<AndroidProjectFile[]>(projectFiles || [...DEFAULT_ANDROID_FILES]);
   const [selectedFilePath, setSelectedFilePath] = useState<string>('.github/workflows/android-build.yml');
@@ -247,6 +250,18 @@ export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
             <Upload className="w-4 h-4 text-blue-400" />
             <span>{language === 'ur' ? 'فائل اپلوڈ کریں' : 'Upload Files'}</span>
           </button>
+
+          {/* Repo Cleaner & Sync Button */}
+          {onOpenRepoCleaner && (
+            <button
+              id="viewer-repo-cleaner-btn"
+              onClick={onOpenRepoCleaner}
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-semibold transition cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>{language === 'ur' ? 'متصادم فائلیں ڈیلیٹ کریں' : 'Clean Duplicate Files'}</span>
+            </button>
+          )}
 
           {/* Download Complete Project ZIP */}
           <button

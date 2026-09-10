@@ -19,7 +19,8 @@ import {
   GitBranch,
   Radio,
   Edit3,
-  History
+  History,
+  ExternalLink
 } from 'lucide-react';
 import { generateDebugApkBlob } from '../utils/zipHandler';
 import { AccountSecurity } from '../types';
@@ -743,14 +744,14 @@ export const GitHubActionRunner: React.FC<GitHubActionRunnerProps> = ({
                 </div>
                 <p className="text-xs text-emerald-300/90 mt-1">
                   {language === 'ur'
-                    ? 'آپ براہ راست نیچے دیے گئے بٹن سے app-debug.apk ڈاؤنلوڈ کر سکتے ہیں اور اپنے موبائل یا ایمولیٹر میں انسٹال کر سکتے ہیں۔'
-                    : 'The GitHub Action uploaded the debug APK artifact. Click below to download app-debug.apk directly to your device.'}
+                    ? 'براؤزر سمولیشن ٹیسٹ مکمل ہو چکا ہے۔ اصلی اور مکمل 15MB - 25MB والی انسٹال ہونے والی اینڈرائیڈ APK گٹ ہب ایکشنز (GitHub Cloud) پر تیار ہوتی ہے۔'
+                    : 'The GitHub Action simulation finished. The real 15MB - 25MB runnable Android APK is built directly on GitHub Cloud Runners.'}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] font-mono text-emerald-400/80">
                   <span>File: <strong className="text-white">app-debug.apk</strong></span>
-                  <span>Size: <strong className="text-white">14.8 MB</strong></span>
+                  <span>Browser Stub: <strong className="text-amber-300">~1.15 KB (Simulation)</strong></span>
+                  <span>Cloud APK Size: <strong className="text-emerald-300">~15-25 MB (Full Build)</strong></span>
                   <span>Target SDK: <strong className="text-white">34 (Android 14)</strong></span>
-                  <span>SHA-256: <strong className="text-white">9b4a...f72c</strong></span>
                 </div>
               </div>
             </div>
@@ -767,9 +768,25 @@ export const GitHubActionRunner: React.FC<GitHubActionRunnerProps> = ({
                 <span>
                   {apkDownloaded
                     ? (language === 'ur' ? '✓ ڈاؤنلوڈ ہو گیا!' : '✓ Downloaded!')
-                    : (language === 'ur' ? '📥 app-debug.apk ڈاؤنلوڈ' : 'Download app-debug.apk')}
+                    : (language === 'ur' ? '📥 ٹیسٹ پیکج ڈاؤنلوڈ (1.15 KB)' : 'Download Test Stub (1.15 KB)')}
                 </span>
               </button>
+
+              {/* Direct Link to Real GitHub Actions Runs */}
+              <a
+                href="https://github.com/rehmanmobilez786/Android-apk-builder-GitHub-studio-/actions"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-bold text-xs transition cursor-pointer"
+                title="Open GitHub Actions to download real 20MB APK"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-300" />
+                <span>
+                  {language === 'ur'
+                    ? 'گٹ ہب پر اصلی 20MB والی APK دیکھیں'
+                    : 'Get Real 20MB APK on GitHub'}
+                </span>
+              </a>
 
               {/* Edit this Build Button */}
               {onEditCurrentBuild && (

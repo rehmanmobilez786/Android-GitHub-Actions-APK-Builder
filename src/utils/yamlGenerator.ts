@@ -193,7 +193,17 @@ export function generateWorkflowYaml(config: WorkflowConfig): { yaml: string; an
   }
 
   addLine(`      - name: 🔑 Make Gradle Wrapper Executable`);
-  addLine(`        run: chmod +x ./gradlew`);
+  addLine(`        run: chmod +x ./gradlew || true`);
+
+  addLine(`      - name: 🧹 Auto-Clean Conflicting Duplicate Files`, {
+    stepName: 'Remove Conflicting Files',
+    description: 'Deletes duplicate .kts build files (build.gradle.kts, settings.gradle.kts) to prevent fatal Gradle collision errors.',
+    category: 'build',
+  });
+  addLine(`        run: |`);
+  addLine(`          echo "Removing conflicting build files if present..."`);
+  addLine(`          rm -f build.gradle.kts settings.gradle.kts app/build.gradle.kts app/settings.gradle.kts`);
+  addLine(`          echo "✅ Conflicting KTS files cleaned."`);
 
   // Decode Keystore Step
   if (signing.enableKeystoreSigning) {

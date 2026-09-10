@@ -56,7 +56,13 @@ jobs:
           cache-read-only: false
 
       - name: 🔑 Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
+        run: chmod +x gradlew || true
+
+      - name: 🧹 Auto-Clean Conflicting Duplicate Files
+        run: |
+          echo "Checking and removing conflicting build files..."
+          rm -f build.gradle.kts settings.gradle.kts app/build.gradle.kts app/settings.gradle.kts
+          echo "✅ Conflicting KTS files cleaned."
 
       - name: 🔍 Run Android Lint
         if: \${{ github.event.inputs.run_lint != 'false' }}
