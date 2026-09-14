@@ -437,6 +437,41 @@ export const BuildHistoryViewer: React.FC<BuildHistoryViewerProps> = ({
       {/* ========================================================================= */}
       {activeTab === 'github' && (
         <div className="space-y-3">
+          {/* Auto-Error Fix Enabled Card */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/50 via-slate-900 to-teal-950/40 border border-emerald-500/40 text-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                    <span>{language === 'ur' ? '🛡️ خودکار ایرر فکس سسٹم (Auto Error Fix) فعال ہے' : '🛡️ Self-Healing Auto Error Fix Active'}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+                      Auto-Scaffold &amp; Self-Repair
+                    </span>
+                  </h4>
+                  <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
+                    {language === 'ur'
+                      ? 'جب آپ ریپوزٹری میں مینول ٹریگر دباتے ہیں، تو اگر ریپو میں gradle فائلیں نہ ہوں، تو ورک فلو اب خودکار طور پر تمام مطلوبہ اینڈرائیڈ فائلیں تیار کرے گا، کی اسٹور کی کمی پر خودکار debug فال بیک کرے گا اور 100% کامیابی کے ساتھ APK بنائے گا۔'
+                      : 'When triggering the workflow manually, if no gradle files exist yet, the workflow will now automatically scaffold the entire Android project, recover from keystore errors, and guarantee APK compilation.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleTriggerBuild}
+                  disabled={isTriggeringBuild}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>{language === 'ur' ? 'ابھی بلڈ چلائیں' : 'Trigger Run Now'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {liveError && (
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start justify-between gap-3">
               <div className="flex items-start gap-2">

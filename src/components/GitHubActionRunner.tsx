@@ -71,6 +71,13 @@ Violation of CI/CD Automated Runner Security Policy.
 Account status automatically flagged: SUSPENDED. Action runner killed with SIGKILL.`,
   },
   {
+    id: 'setup-java-no-gradle-cache',
+    labelEn: 'Error: No file matched to [**/*.gradle*] (setup-java cache fail)',
+    labelUr: 'ایرر: No file matched to [**/*.gradle*] (setup-java cache ایرر)',
+    stepId: 'setup-java',
+    errorLog: `No file in /home/runner/work/Android-GitHub-Actions-APK-Builder/Android-GitHub-Actions-APK-Builder matched to [**/*.gradle*, **/gradle-wrapper.properties, buildSrc/**/Versions.kt, buildSrc/**/Dependencies.kt, gradle/*.versions.toml, **/versions.properties], make sure you have checked out the target repository`,
+  },
+  {
     id: 'java-mismatch',
     labelEn: 'Error: Java 11 incompatible with AGP 8.2 (Requires Java 17)',
     labelUr: 'ایرر: Java 11 اینڈرائیڈ AGP 8.2 سے غیر مطابقت (Java 17 درکار ہے)',
