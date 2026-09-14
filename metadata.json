@@ -1,6 +1,6 @@
 {
-  "name": "Android GitHub Actions Workflow Generator",
-  "description": "Universal GitHub Actions CI/CD and automated Android APK builder: upload Android source, auto-purge previous source, trigger cloud compilation, and track real-time APK build history & releases.",
+  "name": "SafeKid View",
+  "description": "A secure kids educational video viewer with complete parental monitoring controls, timers, search filters, and custom whitelisting.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
