@@ -16,7 +16,10 @@ import {
   ExternalLink,
   ShieldCheck,
   Package,
-  Layers
+  Layers,
+  Wrench,
+  Download,
+  Play
 } from 'lucide-react';
 import { AndroidProjectFile } from '../data/defaultAndroidProject';
 import JSZip from 'jszip';
@@ -24,7 +27,9 @@ import {
   GitHubRepoSettings, 
   getSavedGitHubSettings, 
   saveGitHubSettings, 
-  pushAndReplaceSourceToGitHub 
+  pushAndReplaceSourceToGitHub,
+  triggerWorkflowDispatch,
+  detectCurrentGitHubRepo
 } from '../utils/githubWorkflowApi';
 
 interface SourceCodeManagerModalProps {
@@ -61,7 +66,9 @@ export const SourceCodeManagerModal: React.FC<SourceCodeManagerModalProps> = ({
   const [isPushing, setIsPushing] = useState(false);
   const [pushSuccess, setPushSuccess] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
+  const [autoFixedMsg, setAutoFixedMsg] = useState<string | null>(null);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
   if (!isOpen) return null;
 
@@ -183,9 +190,9 @@ export const SourceCodeManagerModal: React.FC<SourceCodeManagerModalProps> = ({
     const filesToPush = uploadedFiles.length > 0 ? uploadedFiles : projectFiles;
 
     if (!settings.token || !settings.token.trim()) {
-      alert(
+      setPushError(
         language === 'ur'
-          ? 'براہِ کرم پہلے اپنا GitHub Personal Access Token درج کریں۔'
+          ? 'براہِ کرم پہلے اپنا GitHub Personal Access Token درج کریں (نیچے دیے گئے لنک سے بنائیں)۔'
           : 'Please enter your GitHub Personal Access Token first.'
       );
       return;
@@ -194,6 +201,7 @@ export const SourceCodeManagerModal: React.FC<SourceCodeManagerModalProps> = ({
     setIsPushing(true);
     setPushSuccess(false);
     setPushError(null);
+    setAutoFixedMsg(null);
 
     const res = await pushAndReplaceSourceToGitHub(
       settings,
@@ -209,6 +217,104 @@ export const SourceCodeManagerModal: React.FC<SourceCodeManagerModalProps> = ({
       }
     } else {
       setPushError(res.message);
+    }
+  };
+
+  // Trigger existing workflow without committing new source files
+  const handleTriggerOnly = async () => {
+    if (!settings.token || !settings.token.trim()) {
+      setPushError(
+        language === 'ur'
+          ? 'ورک فلو چلانے کے لیے GitHub Personal Access Token درکار ہے۔'
+          : 'GitHub Personal Access Token is required to trigger workflow.'
+      );
+      return;
+    }
+
+    setIsPushing(true);
+    setPushSuccess(false);
+    setPushError(null);
+    setAutoFixedMsg(null);
+
+    const res = await triggerWorkflowDispatch(settings, 'release');
+    setIsPushing(false);
+    if (res.success) {
+      setPushSuccess(true);
+    } else {
+      setPushError(res.message);
+    }
+  };
+
+  // 🛡️ Comprehensive Auto Error Fix & Self-Healing Action
+  const handleAutoFixError = async () => {
+    const detected = detectCurrentGitHubRepo();
+    const fixedSettings: GitHubRepoSettings = {
+      owner: detected.owner || 'ez786',
+      repo: detected.repo || 'Android-GitHub-Actions-APK-Builder',
+      branch: (settings.branch || 'main').trim(),
+      token: (settings.token || '').trim(),
+    };
+
+    setSettings(fixedSettings);
+    saveGitHubSettings(fixedSettings);
+
+    // Apply clean files to workspace
+    if (uploadedFiles.length > 0) {
+      onUpdateProjectFiles(uploadedFiles);
+    }
+
+    setAutoFixedMsg(
+      language === 'ur'
+        ? `✅ ریپوزٹری کی سیٹنگز خودکار درست کر دی گئیں: ${fixedSettings.owner}/${fixedSettings.repo}`
+        : `✅ Repository settings auto-corrected to: ${fixedSettings.owner}/${fixedSettings.repo}`
+    );
+    setPushError(null);
+
+    // If token exists, auto retry!
+    if (fixedSettings.token) {
+      setIsPushing(true);
+      const res = await pushAndReplaceSourceToGitHub(
+        fixedSettings,
+        uploadedFiles.length > 0 ? uploadedFiles : projectFiles,
+        '🚀 [Auto-Repair & Deploy] Clean Android Source & Purge'
+      );
+      setIsPushing(false);
+      if (res.success) {
+        setPushSuccess(true);
+      } else {
+        setPushError(res.message);
+      }
+    }
+  };
+
+  // 📦 Download Clean Android Project ZIP
+  const handleDownloadCleanZip = async () => {
+    setIsDownloadingZip(true);
+    try {
+      const zip = new JSZip();
+      const files = uploadedFiles.length > 0 ? uploadedFiles : projectFiles;
+
+      files.forEach((file) => {
+        if (file.type === 'binary') {
+          zip.file(file.path, file.content, { base64: true });
+        } else {
+          zip.file(file.path, file.content);
+        }
+      });
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Clean-Android-Project-${settings.owner || 'ez786'}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download clean ZIP error:', err);
+    } finally {
+      setIsDownloadingZip(false);
     }
   };
 
@@ -363,10 +469,20 @@ git push origin ${settings.branch || 'main'}`;
 
           {/* STEP 2: GitHub Repository Connection */}
           <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-sky-400" />
-              <span>{language === 'ur' ? '2. گٹ ہب ریپوزٹری اور ٹوکن (ایک کلک پش کے لیے)' : '2. GitHub Repo & Token (For 1-Click Push)'}</span>
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-sky-400" />
+                <span>{language === 'ur' ? '2. گٹ ہب ریپوزٹری اور ٹوکن (ایک کلک پش کے لیے)' : '2. GitHub Repo & Token (For 1-Click Push)'}</span>
+              </h4>
+              <button
+                onClick={handleAutoFixError}
+                className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition cursor-pointer"
+                title="Auto detect and set ez786 repo"
+              >
+                <Wrench className="w-3 h-3 text-emerald-400" />
+                <span>{language === 'ur' ? 'آٹو سیٹ ریپو' : 'Auto Set Repo'}</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2 space-y-1">
@@ -377,7 +493,7 @@ git push origin ${settings.branch || 'main'}`;
                     value={settings.owner}
                     onChange={(e) => handleUpdateSettings({ owner: e.target.value })}
                     className="bg-transparent text-emerald-400 font-mono w-1/2 focus:outline-none"
-                    placeholder="Owner"
+                    placeholder="Owner (e.g. ez786)"
                   />
                   <span className="text-slate-500">/</span>
                   <input
@@ -385,7 +501,7 @@ git push origin ${settings.branch || 'main'}`;
                     value={settings.repo}
                     onChange={(e) => handleUpdateSettings({ repo: e.target.value })}
                     className="bg-transparent text-emerald-400 font-mono w-1/2 focus:outline-none"
-                    placeholder="Repo"
+                    placeholder="Repo (e.g. Android-GitHub-Actions-APK-Builder)"
                   />
                 </div>
               </div>
@@ -406,7 +522,7 @@ git push origin ${settings.branch || 'main'}`;
               <div className="flex items-center justify-between">
                 <label className="text-[11px] text-slate-400 flex items-center gap-1">
                   <Key className="w-3 h-3 text-yellow-400" />
-                  <span>GitHub Personal Access Token (repo scope)</span>
+                  <span>GitHub Personal Access Token (repo, workflow scope)</span>
                 </label>
                 <a
                   href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=Android-APK-Studio-Sync"
@@ -436,19 +552,37 @@ git push origin ${settings.branch || 'main'}`;
               </div>
             </div>
 
-            {/* Push Button */}
-            <button
-              onClick={handlePushToGitHub}
-              disabled={isPushing}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-950/60 cursor-pointer disabled:opacity-50"
-            >
-              <FolderSync className={`w-4 h-4 ${isPushing ? 'animate-spin' : ''}`} />
-              <span>
-                {isPushing
-                  ? (language === 'ur' ? 'گٹ ہب پر پرانا سورس کوڈ ہٹایا جا رہا ہے اور نیا پش ہو رہا ہے...' : 'Purging old files & pushing to GitHub...')
-                  : (language === 'ur' ? '🚀 گٹ ہب پر پش کریں اور APK بلڈ چلائیں' : '🚀 Push & Start Android APK Build')}
-              </span>
-            </button>
+            {/* Push & Trigger Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={handlePushToGitHub}
+                disabled={isPushing}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-950/60 cursor-pointer disabled:opacity-50"
+              >
+                <FolderSync className={`w-4 h-4 ${isPushing ? 'animate-spin' : ''}`} />
+                <span>
+                  {isPushing
+                    ? (language === 'ur' ? 'پش ہو رہا ہے...' : 'Pushing to GitHub...')
+                    : (language === 'ur' ? '🚀 سورس پش کریں اور APK بلڈ چلائیں' : '🚀 Push Source & Build APK')}
+                </span>
+              </button>
+
+              <button
+                onClick={handleTriggerOnly}
+                disabled={isPushing}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50"
+              >
+                <Play className="w-4 h-4 text-emerald-400" />
+                <span>{language === 'ur' ? '▶️ صرف بلڈ چلائیں (Trigger Run)' : '▶️ Trigger Run Only'}</span>
+              </button>
+            </div>
+
+            {autoFixedMsg && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{autoFixedMsg}</span>
+              </div>
+            )}
 
             {pushSuccess && (
               <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
@@ -474,10 +608,74 @@ git push origin ${settings.branch || 'main'}`;
               </div>
             )}
 
+            {/* 🛡️ SELF-HEALING AUTO ERROR FIX PANEL */}
             {pushError && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span>{pushError}</span>
+              <div className="p-4 rounded-xl bg-gradient-to-r from-red-950/40 via-slate-900 to-amber-950/30 border border-red-500/40 space-y-3">
+                <div className="flex items-start gap-2.5 text-xs text-red-300">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-red-200">
+                      {language === 'ur' ? 'ایرر الرٹ: ' : 'Error Alert: '}
+                    </strong>
+                    <span>{pushError}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-950/80 border border-emerald-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{language === 'ur' ? 'خودکار ایرر فکس تجاویز (Auto Error Fix Solutions):' : 'Self-Healing Solutions:'}</span>
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                      {settings.owner || 'ez786'}/{settings.repo || 'Android-GitHub-Actions-APK-Builder'}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    {language === 'ur'
+                      ? 'اگر موبائل براؤزر پر "Failed to fetch" یا کنکشن کا مسئلہ آئے تو آپ ان 3 خودکار طریقوں میں سے کوئی بھی استعمال کر سکتے ہیں:'
+                      : 'If you encounter "Failed to fetch" or CORS issues on mobile, choose any of these instant resolution options:'}
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {/* Solution 1: Auto Fix Settings & Retry */}
+                    <button
+                      onClick={handleAutoFixError}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer transition shadow"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>{language === 'ur' ? '1. آٹو ریپو فکس کریں اور ری ٹرائی' : '1. Auto-Fix Repo & Retry'}</span>
+                    </button>
+
+                    {/* Solution 2: Download Clean ZIP */}
+                    <button
+                      onClick={handleDownloadCleanZip}
+                      disabled={isDownloadingZip}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs cursor-pointer transition shadow"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>
+                        {isDownloadingZip
+                          ? (language === 'ur' ? 'ZIP تیار ہو رہی ہے...' : 'Zipping...')
+                          : (language === 'ur' ? '2. کلین سورس ZIP ڈاؤنلوڈ کریں' : '2. Download Clean ZIP')}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Solution 3: Direct Web Upload */}
+                  <div className="pt-1">
+                    <a
+                      href={`https://github.com/${encodeURIComponent(settings.owner || 'ez786')}/${encodeURIComponent(settings.repo || 'Android-GitHub-Actions-APK-Builder')}/upload/${encodeURIComponent(settings.branch || 'main')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600/90 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer transition shadow"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>{language === 'ur' ? '3. گٹ ہب ویب سائٹ پر براہِ راست اپلوڈ کریں (No Token Needed)' : '3. Open GitHub Web Upload (Direct)'}</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             )}
           </div>

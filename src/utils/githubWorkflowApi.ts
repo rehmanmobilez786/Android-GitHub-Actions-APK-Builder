@@ -10,21 +10,46 @@ export interface GitHubRepoSettings {
 
 const STORAGE_KEY = 'android_builder_github_settings';
 
+export function detectCurrentGitHubRepo(): { owner: string; repo: string } {
+  let owner = 'ez786';
+  let repo = 'Android-GitHub-Actions-APK-Builder';
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.includes('.github.io')) {
+      const detectedOwner = host.split('.')[0];
+      if (detectedOwner && detectedOwner !== 'localhost') {
+        owner = detectedOwner;
+      }
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      if (pathParts.length > 0 && pathParts[0]) {
+        repo = pathParts[0];
+      }
+    }
+  }
+  return { owner, repo };
+}
+
 export function getSavedGitHubSettings(): GitHubRepoSettings {
+  const detected = detectCurrentGitHubRepo();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.owner && parsed.repo) {
-        return parsed;
+      // If user had the old placeholder rehmanmobilez786, auto-repair to detected repo!
+      if (parsed.owner === 'rehmanmobilez786' || !parsed.owner || parsed.repo === 'Android-apk-builder-GitHub-studio-') {
+        parsed.owner = detected.owner;
+        parsed.repo = detected.repo;
+        saveGitHubSettings(parsed);
       }
+      return parsed;
     }
   } catch (e) {
     console.error('Error reading saved github settings', e);
   }
   return {
-    owner: 'rehmanmobilez786',
-    repo: 'Android-apk-builder-GitHub-studio-',
+    owner: detected.owner,
+    repo: detected.repo,
     branch: 'main',
     token: '',
   };
@@ -51,19 +76,20 @@ export async function fetchLiveGitHubBuilds(settings: GitHubRepoSettings): Promi
     Accept: 'application/vnd.github.v3+json',
   };
   if (token && token.trim()) {
-    headers.Authorization = `Bearer ${token.trim()}`;
+    const clean = token.trim();
+    headers.Authorization = clean.startsWith('Bearer ') || clean.startsWith('token ') ? clean : `Bearer ${clean}`;
   }
 
   try {
     // 1. Fetch Workflow Runs
     const runsPromise = fetch(
-      `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=20`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?per_page=20`,
       { headers }
     );
 
     // 2. Fetch Releases (which contain the real compiled APKs)
     const releasesPromise = fetch(
-      `https://api.github.com/repos/${owner}/${repo}/releases?per_page=20`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases?per_page=20`,
       { headers }
     );
 
@@ -142,7 +168,9 @@ export async function fetchLiveGitHubBuilds(settings: GitHubRepoSettings): Promi
     return {
       runs: [],
       releases: [],
-      error: err.message || 'Failed to fetch GitHub Action runs.',
+      error: err.message === 'Failed to fetch'
+        ? `کنکشن یا ریپوزٹری ایرر (Failed to fetch): براہِ کرم یقینی بنائیں کہ ریپوزٹری کا نام '${owner}/${repo}' درست ہے۔`
+        : (err.message || 'Failed to fetch GitHub Action runs.'),
     };
   }
 }
@@ -163,13 +191,16 @@ export async function triggerWorkflowDispatch(
     };
   }
 
+  const clean = token.trim();
+  const authHeader = clean.startsWith('Bearer ') || clean.startsWith('token ') ? clean : `Bearer ${clean}`;
+
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/workflows/${workflowFile}/dispatches`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token.trim()}`,
+          Authorization: authHeader,
           Accept: 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },
@@ -190,15 +221,23 @@ export async function triggerWorkflowDispatch(
       };
     } else {
       const errText = await res.text();
+      let hint = '';
+      if (res.status === 404) {
+        hint = ` (ریپوزٹری '${owner}/${repo}' یا ورک فلو '${workflowFile}' نہیں ملا۔ ریپوزٹری اور برانچ چیک کریں)`;
+      } else if (res.status === 401 || res.status === 403) {
+        hint = ' (ٹوکن کی اجازت ناکافی ہے: workflow اور repo اسکوپ درکار ہے)';
+      }
       return {
         success: false,
-        message: `GitHub returned (${res.status}): ${errText}`,
+        message: `GitHub returned (${res.status}): ${errText}${hint}`,
       };
     }
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || 'Failed to trigger workflow dispatch.',
+      message: err.message === 'Failed to fetch'
+        ? `نیٹ ورک یا CORS ایرر (Failed to fetch): براہِ کرم یقینی بنائیں کہ ریپوزٹری کا نام '${owner}/${repo}' اور ٹوکن درست ہیں۔`
+        : (err.message || 'Failed to trigger workflow dispatch.'),
     };
   }
 }
@@ -220,8 +259,16 @@ export async function pushAndReplaceSourceToGitHub(
     };
   }
 
-  const headers = {
-    Authorization: `Bearer ${token.trim()}`,
+  const clean = token.trim();
+  const authHeader = clean.startsWith('Bearer ') || clean.startsWith('token ') ? clean : `Bearer ${clean}`;
+
+  const getHeaders: Record<string, string> = {
+    Authorization: authHeader,
+    Accept: 'application/vnd.github.v3+json',
+  };
+
+  const postHeaders: Record<string, string> = {
+    Authorization: authHeader,
     Accept: 'application/vnd.github.v3+json',
     'Content-Type': 'application/json',
   };
@@ -229,20 +276,26 @@ export async function pushAndReplaceSourceToGitHub(
   try {
     // 1. Get branch commit SHA
     const branchRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`,
-      { headers }
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodeURIComponent(branch)}`,
+      { headers: getHeaders }
     );
     if (!branchRes.ok) {
       const err = await branchRes.text();
-      throw new Error(`Failed to get branch ref: ${err}`);
+      let hint = '';
+      if (branchRes.status === 404) {
+        hint = ` (ریپوزٹری '${owner}/${repo}' یا برانچ '${branch}' نہیں ملی۔ برائے مہربانی ریپوزٹری کی سیٹنگز چیک کریں)`;
+      } else if (branchRes.status === 401 || branchRes.status === 403) {
+        hint = ' (ٹوکن غلط ہے یا پرمیشن نہیں ہے)';
+      }
+      throw new Error(`Failed to get branch ref (${branchRes.status}): ${err}${hint}`);
     }
     const branchData = await branchRes.json();
     const latestCommitSha = branchData.object.sha;
 
     // 2. Get latest commit details to get base tree
     const commitRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/commits/${latestCommitSha}`,
-      { headers }
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits/${latestCommitSha}`,
+      { headers: getHeaders }
     );
     if (!commitRes.ok) {
       const err = await commitRes.text();
@@ -268,32 +321,12 @@ export async function pushAndReplaceSourceToGitHub(
       content: file.content,
     }));
 
-    // Explicitly delete conflicting .kts if present
-    treeItems.push({
-      path: 'build.gradle.kts',
-      mode: '100644',
-      type: 'blob',
-      content: null as any,
-    });
-    treeItems.push({
-      path: 'settings.gradle.kts',
-      mode: '100644',
-      type: 'blob',
-      content: null as any,
-    });
-    treeItems.push({
-      path: 'app/build.gradle.kts',
-      mode: '100644',
-      type: 'blob',
-      content: null as any,
-    });
-
     // 4. Create new tree
     const treeRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/trees`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees`,
       {
         method: 'POST',
-        headers,
+        headers: postHeaders,
         body: JSON.stringify({
           base_tree: baseTreeSha,
           tree: treeItems.filter((item) => item.content !== null),
@@ -303,16 +336,16 @@ export async function pushAndReplaceSourceToGitHub(
 
     if (!treeRes.ok) {
       const err = await treeRes.text();
-      throw new Error(`Failed to create git tree: ${err}`);
+      throw new Error(`Failed to create git tree (${treeRes.status}): ${err}`);
     }
     const newTreeData = await treeRes.json();
 
     // 5. Create new commit
     const newCommitRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/commits`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits`,
       {
         method: 'POST',
-        headers,
+        headers: postHeaders,
         body: JSON.stringify({
           message: commitMessage,
           tree: newTreeData.sha,
@@ -323,16 +356,16 @@ export async function pushAndReplaceSourceToGitHub(
 
     if (!newCommitRes.ok) {
       const err = await newCommitRes.text();
-      throw new Error(`Failed to create commit: ${err}`);
+      throw new Error(`Failed to create commit (${newCommitRes.status}): ${err}`);
     }
     const newCommitData = await newCommitRes.json();
 
     // 6. Update branch ref
     const updateRefRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branch)}`,
       {
         method: 'PATCH',
-        headers,
+        headers: postHeaders,
         body: JSON.stringify({
           sha: newCommitData.sha,
           force: true,
@@ -342,7 +375,7 @@ export async function pushAndReplaceSourceToGitHub(
 
     if (!updateRefRes.ok) {
       const err = await updateRefRes.text();
-      throw new Error(`Failed to update branch ref: ${err}`);
+      throw new Error(`Failed to update branch ref (${updateRefRes.status}): ${err}`);
     }
 
     return {
@@ -352,9 +385,13 @@ export async function pushAndReplaceSourceToGitHub(
     };
   } catch (err: any) {
     console.error('Source replace error:', err);
+    let msg = err.message || 'Failed to replace source code on GitHub.';
+    if (msg.includes('Failed to fetch')) {
+      msg = `کنکشن ایرر (Failed to fetch): گٹ ہب سرور سے براہِ راست رابطہ نہیں ہو سکا۔ برائے مہربانی ریپوزٹری کا درست نام (${owner}/${repo}) چیک کریں اور ٹوکن میں 'repo' اسکوپ کی تصدیق کریں۔`;
+    }
     return {
       success: false,
-      message: err.message || 'Failed to replace source code on GitHub.',
+      message: msg,
     };
   }
 }
