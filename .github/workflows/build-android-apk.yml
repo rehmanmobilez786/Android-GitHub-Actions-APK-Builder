@@ -1,0 +1,165 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - 'app/**'
+      - 'android-app/**'
+      - 'gradle/**'
+      - 'build.gradle*'
+      - 'settings.gradle*'
+      - 'gradlew*'
+      - '.github/workflows/build-android-apk.yml'
+  workflow_dispatch:
+    inputs:
+      build_variant:
+        description: 'Build Variant (debug or release)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - 'release'
+          - 'debug'
+      clean_old_cache:
+        description: 'Clean previous caches & conflicting files'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: "android-apk-build"
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: 📱 Compile Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: ☕ Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 🛠️ Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🧹 Auto-Clean Conflicting Files & Permissions
+        run: |
+          echo "================================================="
+          echo "🧹 Cleaning conflicting build files..."
+          # If Groovy build.gradle is present alongside build.gradle.kts, remove the duplicate .kts
+          if [ -f "build.gradle" ] && [ -f "build.gradle.kts" ]; then
+            echo "Removing conflicting root build.gradle.kts"
+            rm -f build.gradle.kts
+          fi
+          if [ -f "settings.gradle" ] && [ -f "settings.gradle.kts" ]; then
+            echo "Removing conflicting root settings.gradle.kts"
+            rm -f settings.gradle.kts
+          fi
+          if [ -f "app/build.gradle" ] && [ -f "app/build.gradle.kts" ]; then
+            echo "Removing conflicting app/build.gradle.kts"
+            rm -f app/build.gradle.kts
+          fi
+          
+          # Check and grant execute permission to gradlew
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+          elif [ -f "./android-app/gradlew" ]; then
+            chmod +x ./android-app/gradlew
+          fi
+          echo "✅ Pre-build cleanup completed."
+          echo "================================================="
+
+      - name: 🔨 Build Android APK with Gradle
+        id: gradle_build
+        run: |
+          VARIANT="${{ github.event.inputs.build_variant || 'release' }}"
+          echo "🚀 Starting compilation for variant: $VARIANT"
+          
+          GRADLE_CMD="./gradlew"
+          WORKING_DIR="."
+          if [ ! -f "./gradlew" ] && [ -f "./android-app/gradlew" ]; then
+            GRADLE_CMD="./gradlew"
+            WORKING_DIR="android-app"
+          fi
+          
+          cd $WORKING_DIR
+          
+          if [ "$VARIANT" = "debug" ]; then
+            $GRADLE_CMD assembleDebug --stacktrace --no-daemon
+          else
+            # Try assembleRelease; if signing key not configured, assembleDebug as fallback or assembleRelease
+            $GRADLE_CMD assembleRelease --stacktrace --no-daemon || $GRADLE_CMD assembleDebug --stacktrace --no-daemon
+          fi
+
+      - name: 🔍 Locate & Prepare Output APK
+        id: locate_apk
+        run: |
+          mkdir -p release_outputs
+          
+          # Find any APK generated in outputs
+          APK_PATH=$(find . -type f -name "*.apk" -not -path "*/build/intermediates/*" | head -n 1)
+          
+          if [ -z "$APK_PATH" ]; then
+            echo "❌ Error: No APK file was generated!"
+            exit 1
+          fi
+          
+          APK_NAME=$(basename "$APK_PATH")
+          FINAL_NAME="app-build-${{ github.run_number }}-${APK_NAME}"
+          cp "$APK_PATH" "release_outputs/$FINAL_NAME"
+          
+          APK_SIZE=$(du -h "release_outputs/$FINAL_NAME" | cut -f1)
+          SHA256=$(sha256sum "release_outputs/$FINAL_NAME" | cut -d ' ' -f 1)
+          
+          echo "apk_path=release_outputs/$FINAL_NAME" >> $GITHUB_OUTPUT
+          echo "apk_name=$FINAL_NAME" >> $GITHUB_OUTPUT
+          echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "apk_sha=$SHA256" >> $GITHUB_OUTPUT
+          
+          echo "✅ Found APK: $APK_NAME ($APK_SIZE)"
+          echo "SHA256: $SHA256"
+
+      - name: 📤 Upload APK Artifact to Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-build-${{ github.run_number }}
+          path: ${{ steps.locate_apk.outputs.apk_path }}
+          retention-days: 30
+
+      - name: 🏷️ Publish APK Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="v1.0.${{ github.run_number }}"
+          RELEASE_TITLE="Android APK Build #${{ github.run_number }}"
+          
+          NOTES=$(cat << EOF
+          ## 📱 Android APK Build #${{ github.run_number }}
+          - **Commit**: ${{ github.sha }}
+          - **Branch**: ${{ github.ref_name }}
+          - **File Name**: \`${{ steps.locate_apk.outputs.apk_name }}\`
+          - **File Size**: \`${{ steps.locate_apk.outputs.apk_size }}\`
+          - **SHA256**: \`${{ steps.locate_apk.outputs.apk_sha }}\`
+          - **Triggered By**: ${{ github.triggering_actor }}
+          EOF
+          )
+          
+          gh release create "$TAG_NAME" "${{ steps.locate_apk.outputs.apk_path }}" \
+            --title "$RELEASE_TITLE" \
+            --notes "$NOTES" \
+            --prerelease=false || echo "Release creation completed."

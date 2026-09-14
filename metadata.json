@@ -1,6 +1,6 @@
 {
   "name": "Android GitHub Actions Workflow Generator",
-  "description": "Universal GitHub Actions workflow generator for Android apps to automate testing, linting, keystore signing, APK/AAB building, and multi-channel deployment.",
+  "description": "Universal GitHub Actions CI/CD and automated Android APK builder: upload Android source, auto-purge previous source, trigger cloud compilation, and track real-time APK build history & releases.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

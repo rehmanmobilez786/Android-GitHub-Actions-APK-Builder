@@ -17,7 +17,8 @@ import {
   Sliders,
   Languages,
   History,
-  Globe
+  Globe,
+  FolderSync
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -36,6 +37,7 @@ interface HeaderProps {
   onOpenSecretsChecklist: () => void;
   onOpenAiCustomizer: () => void;
   onOpenGitHubPagesHelp?: () => void;
+  onOpenSourceCodeManager?: () => void;
   onCopyYaml: () => void;
   onDownloadYaml: () => void;
   copied: boolean;
@@ -57,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSecretsChecklist,
   onOpenAiCustomizer,
   onOpenGitHubPagesHelp,
+  onOpenSourceCodeManager,
   onCopyYaml,
   onDownloadYaml,
   copied,
@@ -214,6 +217,18 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{language === 'ur' ? 'گٹ ہب پیجز فکسر' : 'GitHub Pages Fix'}</span>
+              </button>
+            )}
+
+            {onOpenSourceCodeManager && (
+              <button
+                id="header-source-mgr-btn"
+                onClick={onOpenSourceCodeManager}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/30 hover:to-teal-600/30 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+                title="Upload & Auto-Replace Android Source Code"
+              >
+                <FolderSync className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{language === 'ur' ? 'سورس کوڈ آٹو ریپلیس' : 'Auto-Replace Source'}</span>
               </button>
             )}
 

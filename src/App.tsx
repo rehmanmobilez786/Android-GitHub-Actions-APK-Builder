@@ -18,6 +18,7 @@ import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { BuildHistoryViewer } from './components/BuildHistoryViewer';
 import { EditBuildModal } from './components/EditBuildModal';
 import { GitHubPagesHelpModal } from './components/GitHubPagesHelpModal';
+import { SourceCodeManagerModal } from './components/SourceCodeManagerModal';
 import { AndroidProjectFile, DEFAULT_ANDROID_FILES } from './data/defaultAndroidProject';
 import { 
   getBuildHistory, 
@@ -80,6 +81,7 @@ export default function App() {
   const [isSecretsModalOpen, setIsSecretsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isGitHubPagesModalOpen, setIsGitHubPagesModalOpen] = useState(false);
+  const [isSourceCodeManagerOpen, setIsSourceCodeManagerOpen] = useState(false);
 
   // Generate YAML and Annotations
   const { yaml: generatedYaml, annotations } = useMemo(() => {
@@ -271,6 +273,7 @@ export default function App() {
         onOpenSecretsChecklist={() => setIsSecretsModalOpen(true)}
         onOpenAiCustomizer={() => setIsAiModalOpen(true)}
         onOpenGitHubPagesHelp={() => setIsGitHubPagesModalOpen(true)}
+        onOpenSourceCodeManager={() => setIsSourceCodeManagerOpen(true)}
         onCopyYaml={handleCopyYaml}
         onDownloadYaml={handleDownloadYaml}
         copied={copied}
@@ -383,6 +386,7 @@ export default function App() {
             language={language}
             projectFiles={projectFiles}
             onUpdateProjectFiles={setProjectFiles}
+            onOpenSourceCodeManager={() => setIsSourceCodeManagerOpen(true)}
           />
         )}
 
@@ -396,6 +400,7 @@ export default function App() {
             security={security}
             onOpenSecurityCenter={() => setIsSecurityCenterOpen(true)}
             language={language}
+            onOpenSourceCodeManager={() => setIsSourceCodeManagerOpen(true)}
           />
         )}
 
@@ -471,6 +476,15 @@ export default function App() {
         isOpen={isGitHubPagesModalOpen}
         onClose={() => setIsGitHubPagesModalOpen(false)}
         language={language}
+      />
+
+      <SourceCodeManagerModal
+        isOpen={isSourceCodeManagerOpen}
+        onClose={() => setIsSourceCodeManagerOpen(false)}
+        language={language}
+        projectFiles={projectFiles}
+        onUpdateProjectFiles={(newFiles) => setProjectFiles(newFiles)}
+        onNavigateToHistory={() => setActiveTab('history')}
       />
     </div>
   );

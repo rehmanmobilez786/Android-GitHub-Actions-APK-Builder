@@ -26,6 +26,7 @@ interface AndroidProjectViewerProps {
   projectFiles?: AndroidProjectFile[];
   onUpdateProjectFiles?: (files: AndroidProjectFile[]) => void;
   onOpenRepoCleaner?: () => void;
+  onOpenSourceCodeManager?: () => void;
 }
 
 export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
@@ -35,6 +36,7 @@ export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
   projectFiles,
   onUpdateProjectFiles,
   onOpenRepoCleaner,
+  onOpenSourceCodeManager,
 }) => {
   const [files, setFiles] = useState<AndroidProjectFile[]>(projectFiles || [...DEFAULT_ANDROID_FILES]);
   const [selectedFilePath, setSelectedFilePath] = useState<string>('.github/workflows/android-build.yml');
@@ -250,6 +252,19 @@ export const AndroidProjectViewer: React.FC<AndroidProjectViewerProps> = ({
             <Upload className="w-4 h-4 text-blue-400" />
             <span>{language === 'ur' ? 'فائل اپلوڈ کریں' : 'Upload Files'}</span>
           </button>
+
+          {/* Auto-Replace Source Code Button */}
+          {onOpenSourceCodeManager && (
+            <button
+              id="viewer-auto-replace-btn"
+              onClick={onOpenSourceCodeManager}
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-semibold transition cursor-pointer"
+              title="Upload new project and automatically purge old source code"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>{language === 'ur' ? 'سورس کوڈ آٹو ریپلیس' : 'Auto-Replace Source'}</span>
+            </button>
+          )}
 
           {/* Repo Cleaner & Sync Button */}
           {onOpenRepoCleaner && (

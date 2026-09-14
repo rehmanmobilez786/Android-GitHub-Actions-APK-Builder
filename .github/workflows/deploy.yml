@@ -3,6 +3,10 @@ name: Deploy Web App to GitHub Pages
 on:
   push:
     branches: ["main", "master"]
+    paths-ignore:
+      - 'app/**'
+      - 'android-app/**'
+      - 'release_outputs/**'
   workflow_dispatch:
 
 permissions:

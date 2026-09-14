@@ -141,4 +141,27 @@ export interface ApkBuildHistoryItem {
   changesSummary?: string;
 }
 
+export interface GitHubActionRunItem {
+  id: number;
+  name: string;
+  run_number: number;
+  status: 'completed' | 'in_progress' | 'queued' | 'waiting' | string;
+  conclusion: 'success' | 'failure' | 'cancelled' | 'timed_out' | string | null;
+  html_url: string;
+  created_at: string;
+  updated_at: string;
+  head_branch: string;
+  head_sha: string;
+  event: string;
+  display_title: string;
+  actor: {
+    login: string;
+    avatar_url: string;
+  };
+  artifactsCount?: number;
+  apkDownloadUrl?: string;
+  apkReleaseName?: string;
+  apkSize?: string;
+}
+
 
